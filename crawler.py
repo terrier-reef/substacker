@@ -80,8 +80,12 @@ class SubstackCrawler:
                     verify=False,
                 )
                 resp.raise_for_status()
+                if not resp.text:
+                    raise RuntimeError("Empty response from API")
                 batch = resp.json()
             except Exception as e:
+                self._emit(f"DEBUG: Response status={resp.status_code if 'resp' in locals() else 'N/A'}")
+                self._emit(f"DEBUG: Response body: {resp.text[:500] if 'resp' in locals() else 'N/A'}")
                 raise RuntimeError(f"Failed to fetch post list: {e}")
 
             if not batch:
