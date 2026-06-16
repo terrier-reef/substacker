@@ -3,10 +3,7 @@ import re
 from urllib.parse import urlparse
 
 import requests
-import urllib3
 from bs4 import BeautifulSoup
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 HEADERS = {
     "User-Agent": (
@@ -40,7 +37,7 @@ class SubstackCrawler:
 
     def get_publication_meta(self) -> dict:
         try:
-            resp = self.session.get(f"{self.base_url}/api/v1/publication", timeout=15, verify=False)
+            resp = self.session.get(f"{self.base_url}/api/v1/publication", timeout=15)
             if resp.ok:
                 data = resp.json()
                 return {
@@ -53,7 +50,7 @@ class SubstackCrawler:
             pass
         # Fallback: parse the homepage
         try:
-            resp = self.session.get(self.base_url, timeout=15, headers={**HEADERS, "Accept": "text/html"}, verify=False)
+            resp = self.session.get(self.base_url, timeout=15, headers={**HEADERS, "Accept": "text/html"})
             soup = BeautifulSoup(resp.text, "lxml")
             title = soup.find("title")
             return {
@@ -73,18 +70,14 @@ class SubstackCrawler:
 
         while True:
             try:
-                url = f"{self.base_url}/api/v1/posts"
-                params = {"limit": page_limit, "offset": offset, "sort": "new"}
-                self._emit(f"DEBUG: Requesting {url} with params {params}")
-                resp = self.session.get(url, params=params, timeout=15, verify=False)
-                self._emit(f"DEBUG: Status={resp.status_code}, Content-Length={len(resp.text)}")
-                self._emit(f"DEBUG: Response preview: {resp.text[:200]}")
+                resp = self.session.get(
+                    f"{self.base_url}/api/v1/posts",
+                    params={"limit": page_limit, "offset": offset, "sort": "new"},
+                    timeout=15,
+                )
                 resp.raise_for_status()
-                if not resp.text:
-                    raise RuntimeError("Empty response from API")
                 batch = resp.json()
             except Exception as e:
-                self._emit(f"DEBUG: Full response: {resp.text if 'resp' in locals() else 'No response'}")
                 raise RuntimeError(f"Failed to fetch post list: {e}")
 
             if not batch:
@@ -110,7 +103,6 @@ class SubstackCrawler:
             resp = self.session.get(
                 f"{self.base_url}/api/v1/posts/{slug}",
                 timeout=20,
-                verify=False,
             )
             resp.raise_for_status()
             data = resp.json()
