@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Substacker — Substack to Kindle</title>
+  <link rel="stylesheet" href="/static/style.css"/>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Substacker</h1>
+      <p class="tagline">Turn any public Substack into a Kindle ebook</p>
+    </header>
+
+    <main>
+      <form id="build-form">
+        <div class="input-row">
+          <input
+            id="url-input"
+            type="url"
+            placeholder="https://example.substack.com"
+            required
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <div class="options-row">
+            <label for="limit-input">
+              Article limit
+              <span class="hint">(0 = all)</span>
+            </label>
+            <input
+              id="limit-input"
+              type="number"
+              min="0"
+              max="9999"
+              value="0"
+              style="width:80px"
+            />
+          </div>
+        </div>
+        <button id="build-btn" type="submit">Build Ebook</button>
+      </form>
+
+      <section id="progress-section" class="hidden">
+        <div class="progress-header">
+          <span id="progress-label">Building...</span>
+          <div class="spinner" id="spinner"></div>
+        </div>
+        <div id="log-box" class="log-box" aria-live="polite"></div>
+      </section>
+
+      <section id="download-section" class="hidden">
+        <div class="success-banner">
+          <span class="check">✓</span>
+          <span id="done-msg">Your ebook is ready!</span>
+        </div>
+        <a id="download-btn" class="download-btn" href="#">
+          Download Ebook
+        </a>
+        <button class="secondary-btn" id="reset-btn">Build another</button>
+      </section>
+
+      <section id="error-section" class="hidden">
+        <div class="error-banner">
+          <span class="x">✗</span>
+          <span id="error-msg">Something went wrong.</span>
+        </div>
+        <button class="secondary-btn" id="error-reset-btn">Try again</button>
+      </section>
+    </main>
+
+    <footer>
+      <p>Works with any public Substack. Install <a href="https://calibre-ebook.com" target="_blank">Calibre</a> on the server for MOBI output; otherwise EPUB is produced.</p>
+    </footer>
+  </div>
+
+  <script>
+    const form = document.getElementById('build-form');
+    const urlInput = document.getElementById('url-input');
+    const limitInput = document.getElementById('limit-input');
+    const buildBtn = document.getElementById('build-btn');
+    const progressSection = document.getElementById('progress-section');
+    const progressLabel = document.getElementById('progress-label');
+    const spinner = document.getElementById('spinner');
+    const logBox = document.getElementById('log-box');
+    const downloadSection = document.getElementById('download-section');
+    const downloadBtn = document.getElementById('download-btn');
+    const doneMsg = document.getElementById('done-msg');
+    const resetBtn = document.getElementById('reset-btn');
+    const errorSection = document.getElementById('error-section');
+    const errorMsg = document.getElementById('error-msg');
+    const errorResetBtn = document.getElementById('error-reset-btn');
+
+    let eventSource = null;
+
+    function showOnly(section) {
+      [progressSection, downloadSection, errorSection].forEach(s => s.classList.add('hidden'));
+      if (section) section.classList.remove('hidden');
+    }
+
+    function appendLog(msg) {
+      const line = document.createElement('div');
+      line.className = 'log-line';
+      line.textContent = msg;
+      logBox.appendChild(line);
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    function reset() {
+      if (eventSource) { eventSource.close(); eventSource = null; }
+      showOnly(null);
+      buildBtn.disabled = false;
+      buildBtn.textContent = 'Build Ebook';
+      progressLabel.textContent = 'Building...';
+      spinner.style.display = '';
+      logBox.innerHTML = '';
+    }
+
+    resetBtn.addEventListener('click', reset);
+    errorResetBtn.addEventListener('click', reset);
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const url = urlInput.value.trim();
+      const limit = parseInt(limitInput.value) || 0;
+      if (!url) return;
+
+      reset();
+      buildBtn.disabled = true;
+      buildBtn.textContent = 'Building...';
+      showOnly(progressSection);
+      appendLog(`Starting build for: ${url}`);
+
+      let jobId;
+      try {
+        const resp = await fetch('/build', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, limit }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Failed to start job');
+        jobId = data.job_id;
+      } catch (err) {
+        showOnly(errorSection);
+        errorMsg.textContent = err.message;
+        buildBtn.disabled = false;
+        buildBtn.textContent = 'Build Ebook';
+        return;
+      }
+
+      eventSource = new EventSource(`/progress/${jobId}`);
+
+      eventSource.onmessage = (e) => {
+        appendLog(e.data);
+      };
+
+      eventSource.addEventListener('done', () => {
+        eventSource.close();
+        eventSource = null;
+        progressLabel.textContent = 'Complete!';
+        spinner.style.display = 'none';
+
+        fetch(`/status/${jobId}`)
+          .then(r => r.json())
+          .then(data => {
+            const fname = data.filename || 'ebook';
+            doneMsg.textContent = `${fname} is ready!`;
+            downloadBtn.href = `/download/${jobId}`;
+            downloadBtn.download = fname;
+            showOnly(downloadSection);
+            buildBtn.disabled = false;
+            buildBtn.textContent = 'Build Ebook';
+          });
+      });
+
+      eventSource.addEventListener('error', (e) => {
+        eventSource.close();
+        eventSource = null;
+        showOnly(errorSection);
+        errorMsg.textContent = e.data || 'An unexpected error occurred.';
+        buildBtn.disabled = false;
+        buildBtn.textContent = 'Build Ebook';
+      });
+
+      eventSource.onerror = () => {
+        if (eventSource && eventSource.readyState === EventSource.CLOSED) {
+          eventSource = null;
+        }
+      };
+    });
+  </script>
+</body>
+</html>
