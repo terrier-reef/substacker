@@ -2,7 +2,8 @@ transformers==4.40.0
 peft==0.10.0
 torch==2.2.2
 datasets==2.18.0
-bitsandbytes==0.43.0
+accelerate==0.27.0
+bitsandbytes>=0.43.0
 llama-cpp-python==0.2.79
 flask==3.0.0
 numpy==1.24.3
