@@ -73,19 +73,18 @@ class SubstackCrawler:
 
         while True:
             try:
-                resp = self.session.get(
-                    f"{self.base_url}/api/v1/posts",
-                    params={"limit": page_limit, "offset": offset, "sort": "new"},
-                    timeout=15,
-                    verify=False,
-                )
+                url = f"{self.base_url}/api/v1/posts"
+                params = {"limit": page_limit, "offset": offset, "sort": "new"}
+                self._emit(f"DEBUG: Requesting {url} with params {params}")
+                resp = self.session.get(url, params=params, timeout=15, verify=False)
+                self._emit(f"DEBUG: Status={resp.status_code}, Content-Length={len(resp.text)}")
+                self._emit(f"DEBUG: Response preview: {resp.text[:200]}")
                 resp.raise_for_status()
                 if not resp.text:
                     raise RuntimeError("Empty response from API")
                 batch = resp.json()
             except Exception as e:
-                self._emit(f"DEBUG: Response status={resp.status_code if 'resp' in locals() else 'N/A'}")
-                self._emit(f"DEBUG: Response body: {resp.text[:500] if 'resp' in locals() else 'N/A'}")
+                self._emit(f"DEBUG: Full response: {resp.text if 'resp' in locals() else 'No response'}")
                 raise RuntimeError(f"Failed to fetch post list: {e}")
 
             if not batch:
