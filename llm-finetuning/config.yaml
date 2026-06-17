@@ -1,0 +1,30 @@
+model:
+  name: "microsoft/phi-2"
+  trust_remote_code: true
+
+training:
+  output_dir: "./output/phi-creative-v1"
+  num_train_epochs: 3
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 8
+  learning_rate: 2e-4
+  max_grad_norm: 0.3
+  warmup_ratio: 0.03
+  weight_decay: 0.001
+  save_strategy: "epoch"
+  logging_steps: 10
+  dataloader_num_workers: 0
+
+lora:
+  r: 16
+  lora_alpha: 32
+  target_modules: ["q_proj", "v_proj", "k_proj"]
+  lora_dropout: 0.05
+  bias: "none"
+  task_type: "CAUSAL_LM"
+
+data:
+  train_file: "data/creative_stories.jsonl"
+  max_length: 512
+  text_column: "text"
