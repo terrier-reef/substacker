@@ -8,7 +8,7 @@ training:
   per_device_train_batch_size: 1
   per_device_eval_batch_size: 1
   gradient_accumulation_steps: 8
-  learning_rate: 2e-4
+  learning_rate: 0.0002
   max_grad_norm: 0.3
   warmup_ratio: 0.03
   weight_decay: 0.001
@@ -23,6 +23,7 @@ lora:
   lora_dropout: 0.05
   bias: "none"
   task_type: "CAUSAL_LM"
+  warmup_ratio: 0.03
 
 data:
   train_file: "data/creative_stories.jsonl"
