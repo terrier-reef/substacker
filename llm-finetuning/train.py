@@ -51,11 +51,11 @@ def load_model_for_training(config):
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    # Load model in float16 for CPU efficiency
-    print("Loading model in float16...")
+    # Load model in float32 (CPU doesn't support float16 well)
+    print("Loading model in float32...")
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        torch_dtype=torch.float16,
+        torch_dtype=torch.float32,
         device_map="cpu",
         trust_remote_code=config['model'].get('trust_remote_code', True),
         low_cpu_mem_usage=True,
@@ -166,7 +166,7 @@ def train(config_path="config.yaml"):
         remove_unused_columns=False,
         dataloader_num_workers=config['training']['dataloader_num_workers'],
         dataloader_pin_memory=False,
-        gradient_checkpointing=True,  # Save memory on CPU
+        gradient_checkpointing=False,  # Disabled for CPU (incompatible with float32)
         seed=42,
     )
 
